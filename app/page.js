@@ -8,13 +8,46 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("receipt");
   const [data, setData] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // 預設手機收合
+  const [sidebarOpen, setSidebarOpen] = useState(false); 
 
-  const toBase64 = (file) => new Promise((resolve, reject) => {
+  // 🚀 升級功能：圖片自動壓縮引擎 (解決 413 錯誤與 AI 崩潰問題)
+  const compressImage = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (error) => reject(error);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        // 設定適合 AI 辨識的最大解析度 (1280px 足夠清晰且檔案極小)
+        const MAX_WIDTH = 1280;
+        const MAX_HEIGHT = 1280;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 強制轉為 JPEG 格式，並以 0.8 的品質壓縮
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.8);
+        resolve(compressedBase64);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
   });
 
   const handleImageSelect = async (e) => {
@@ -23,8 +56,10 @@ export default function Home() {
 
     setSelectedFile(file);
     setData(null);
-    const base64String = await toBase64(file);
-    setPreview(base64String);
+    
+    // 使用自動壓縮功能，瞬間將幾 MB 的照片縮小
+    const compressedBase64 = await compressImage(file);
+    setPreview(compressedBase64);
   };
 
   const handleAnalyze = async () => {
@@ -37,13 +72,14 @@ export default function Home() {
     setData(null);
 
     try {
+      // 擷取 Base64 的純資料段
       const base64Data = preview.split(",")[1];
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           base64Image: base64Data,
-          mimeType: selectedFile.type,
+          mimeType: "image/jpeg", // 壓縮時已統一轉為 jpeg
           targetCategory: selectedCategory
         })
       });
@@ -131,7 +167,7 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex">
           {/* 半透明遮罩，點擊即可關閉 */}
           <div 
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity" 
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
             onClick={() => setSidebarOpen(false)}
           ></div>
 
@@ -208,12 +244,12 @@ export default function Home() {
         {loading && (
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="text-blue-600 font-medium mt-2">AI 正在努力萃取圖中資訊，請稍候...</p>
+            <p className="text-blue-600 font-medium mt-2">圖片已壓縮，AI 正在超速辨識中...</p>
           </div>
         )}
 
         {/* 分析結果與編輯表單 */}
-        {data && (
+        {data && !loading && (
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
             <h2 className="text-lg font-bold text-gray-900 border-b pb-2">3. 確認與編輯萃取結果</h2>
             
