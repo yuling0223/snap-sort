@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("receipt");
   const [data, setData] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -15,28 +17,42 @@ export default function Home() {
     reader.onerror = (error) => reject(error);
   });
 
-  const handleImageUpload = async (e) => {
+  // 步驟 1：只選取照片與預覽，不馬上分析
+  const handleImageSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    setLoading(true);
+    setSelectedFile(file);
     setData(null);
     const base64String = await toBase64(file);
     setPreview(base64String);
+  };
+
+  // 步驟 2：點擊按鈕後，才將照片與類別送給 AI 分析
+  const handleAnalyze = async () => {
+    if (!selectedFile || !preview) {
+      alert("請先選擇照片！");
+      return;
+    }
+
+    setLoading(true);
+    setData(null);
 
     try {
+      const base64Data = preview.split(",")[1];
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          base64Image: base64String.split(",")[1],
-          mimeType: file.type
+          base64Image: base64Data,
+          mimeType: selectedFile.type,
+          targetCategory: selectedCategory // 傳遞使用者指定的類別給 AI 參考
         })
       });
       const result = await response.json();
       
       setData({
-        category: result.category || "handwritten_note",
+        category: selectedCategory, // 強制套用使用者選擇的類別
         title: result.title || "",
         summary: result.summary || "",
         full_text: result.full_text || "",
@@ -53,7 +69,7 @@ export default function Home() {
     } catch (error) {
       alert("解析發生錯誤，請手動填寫");
       setData({
-        category: "handwritten_note",
+        category: selectedCategory,
         title: "",
         summary: "",
         full_text: "",
@@ -91,6 +107,7 @@ export default function Home() {
       alert("儲存成功！");
       setData(null);
       setPreview(null);
+      setSelectedFile(null);
     } catch (error) {
       alert("儲存失敗：" + error.message);
     }
@@ -98,7 +115,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-gray-100 font-sans">
-      {/* 左列資料夾選單（依照新排序） */}
+      {/* 左列資料夾選單 */}
       <aside className={`${sidebarOpen ? "w-64" : "w-16"} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           {sidebarOpen && <span className="font-bold text-lg text-gray-800">📂 專案資料夾</span>}
@@ -125,24 +142,26 @@ export default function Home() {
       <main className="flex-1 max-w-xl mx-auto p-6">
         <h1 className="text-2xl font-bold mb-6 text-gray-900">SnapSort 筆記萃取器 📸</h1>
         
-        <input 
-          type="file" accept="image/*"
-          onChange={handleImageUpload} 
-          className="mb-4 block w-full border border-gray-300 p-2 rounded bg-white text-black text-sm"
-        />
+        {/* 上傳檔案按鈕 */}
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-1">1. 選擇照片</label>
+          <input 
+            type="file" accept="image/*"
+            onChange={handleImageSelect} 
+            className="block w-full border border-gray-300 p-2 rounded bg-white text-black text-sm"
+          />
+        </div>
 
-        {loading && <p className="text-blue-500 animate-pulse mb-4">AI 正在努力辨識中...</p>}
-        {preview && <img src={preview} alt="預覽" className="w-full h-auto object-contain rounded mb-6 shadow-sm border bg-black/5" />}
-
-        {data && (
-          <div className="bg-white p-5 rounded-xl shadow-md border border-gray-200 space-y-4">
+        {/* 預覽與類別選擇區塊 */}
+        {preview && (
+          <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200 mb-6 space-y-4">
+            <img src={preview} alt="預覽" className="w-full h-auto object-contain rounded shadow-sm border bg-black/5" />
             
-            {/* 分類下拉選單（依照你指定的順序排列） */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">資料分類</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">2. 選擇這份資料的類別</label>
               <select 
-                value={data.category} 
-                onChange={(e) => setData({ ...data, category: e.target.value })}
+                value={selectedCategory} 
+                onChange={(e) => setSelectedCategory(e.target.value)}
                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-black font-medium focus:ring-2 focus:ring-black focus:outline-none"
               >
                 <option value="receipt">收據 / 發票</option>
@@ -153,6 +172,23 @@ export default function Home() {
               </select>
             </div>
 
+            <button 
+              onClick={handleAnalyze} 
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium shadow flex items-center justify-center"
+            >
+              {loading ? "AI 深度分析中..." : "✨ 開始 AI 分析"}
+            </button>
+          </div>
+        )}
+
+        {loading && <p className="text-blue-500 animate-pulse mb-4 text-center">AI 正在努力萃取圖中資訊，請稍候...</p>}
+
+        {/* 分析結果與編輯表單 */}
+        {data && (
+          <div className="bg-white p-5 rounded-xl shadow-md border border-gray-200 space-y-4">
+            <h2 className="text-lg font-bold text-gray-800 border-b pb-2">3. 確認與編輯萃取結果</h2>
+            
             {/* 標題欄位 */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">標題</label>
@@ -224,7 +260,7 @@ export default function Home() {
             )}
 
             <button onClick={handleSave} className="mt-4 w-full bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition font-medium shadow">
-              確認無誤並儲存
+              確認無誤並儲存至資料庫
             </button>
           </div>
         )}
