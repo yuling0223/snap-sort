@@ -83,7 +83,7 @@ export default function Home() {
       <h1 className="text-2xl font-bold mb-6">Prism 筆記萃取器</h1>
       
       <input 
-        type="file" accept="image/*" capture="environment"
+        type="file" accept="image/*"
         onChange={handleImageUpload} 
         className="mb-4 block w-full border border-gray-300 p-2 rounded"
       />
