@@ -80,7 +80,7 @@ export default function Home() {
 
   return (
     <main className="max-w-md mx-auto p-6 font-sans">
-      <h1 className="text-2xl font-bold mb-6">Prism 筆記萃取器</h1>
+      <h1 className="text-2xl font-bold mb-6">SnapSort 筆記萃取器</h1>
       
       <input 
         type="file" accept="image/*"
