@@ -8,7 +8,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("receipt");
   const [data, setData] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // 預設手機收合
 
   const toBase64 = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -17,7 +17,6 @@ export default function Home() {
     reader.onerror = (error) => reject(error);
   });
 
-  // 步驟 1：只選取照片與預覽，不馬上分析
   const handleImageSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -28,7 +27,6 @@ export default function Home() {
     setPreview(base64String);
   };
 
-  // 步驟 2：點擊按鈕後，才將照片與類別送給 AI 分析
   const handleAnalyze = async () => {
     if (!selectedFile || !preview) {
       alert("請先選擇照片！");
@@ -46,28 +44,29 @@ export default function Home() {
         body: JSON.stringify({
           base64Image: base64Data,
           mimeType: selectedFile.type,
-          targetCategory: selectedCategory // 傳遞使用者指定的類別給 AI 參考
+          targetCategory: selectedCategory
         })
       });
       const result = await response.json();
       
       setData({
-        category: selectedCategory, // 強制套用使用者選擇的類別
+        category: selectedCategory,
         title: result.title || "",
         summary: result.summary || "",
         full_text: result.full_text || "",
         merchant: result.merchant || "",
         date: result.date || "",
-        total_amount: result.total_amount || "",
+        total_amount: result.total_amount ?? "",
         items: result.items || [],
         brand: result.brand || "",
         product_name: result.product_name || "",
-        price: result.price || "",
+        price: result.price ?? "",
         features: result.features || [],
         tasks: result.tasks || []
       });
     } catch (error) {
-      alert("解析發生錯誤，請手動填寫");
+      console.error("前端解析錯誤:", error);
+      alert("解析發生錯誤，請手動填寫欄位");
       setData({
         category: selectedCategory,
         title: "",
@@ -114,55 +113,79 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100 font-sans">
-      {/* 左列資料夾選單 */}
-      <aside className={`${sidebarOpen ? "w-64" : "w-16"} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          {sidebarOpen && <span className="font-bold text-lg text-gray-800">📂 專案資料夾</span>}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 rounded hover:bg-gray-100 text-gray-600">
-            {sidebarOpen ? "◀" : "▶"}
-          </button>
-        </div>
-        {sidebarOpen && (
-          <div className="p-4 space-y-3 text-sm text-gray-600">
-            <div className="font-semibold text-gray-700">我的分類</div>
-            <ul className="space-y-2 pl-2">
-              <li className="cursor-pointer hover:text-black">📄 全部紀錄</li>
-              <li className="cursor-pointer hover:text-black">🧾 收據 / 發票</li>
-              <li className="cursor-pointer hover:text-black">📝 待辦清單</li>
-              <li className="cursor-pointer hover:text-black">🛍️ 商品願望清單</li>
-              <li className="cursor-pointer hover:text-black">📓 筆記</li>
-              <li className="cursor-pointer hover:text-black">📁 其他</li>
-            </ul>
-          </div>
-        )}
-      </aside>
+    <div className="min-h-screen bg-gray-100 font-sans relative flex flex-col">
+      {/* 頂部導覽列與側邊欄開關按鈕 */}
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        <button 
+          onClick={() => setSidebarOpen(true)} 
+          className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm flex items-center gap-2 transition"
+        >
+          📂 <span>專案資料夾</span>
+        </button>
+        <h1 className="text-lg font-bold text-gray-900">SnapSort 📸</h1>
+        <div className="w-16"></div> {/* 佔位保持標題置中 */}
+      </header>
 
-      {/* 主畫面 */}
-      <main className="flex-1 max-w-xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-6 text-gray-900">SnapSort 筆記萃取器 📸</h1>
+      {/* 滑動式側邊欄 (Drawer) 與遮罩 */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* 半透明遮罩，點擊即可關閉 */}
+          <div 
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity" 
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+
+          {/* 側邊欄本體 */}
+          <div className="relative w-72 bg-white h-full shadow-2xl z-10 flex flex-col p-5 transform transition-transform duration-300">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
+              <h2 className="font-bold text-lg text-gray-800">📂 專案資料夾</h2>
+              <button 
+                onClick={() => setSidebarOpen(false)}
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-500 font-bold px-2"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="font-semibold text-gray-500 uppercase text-xs tracking-wider">我的分類</div>
+              <ul className="space-y-1">
+                <li className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition">📄 全部紀錄</li>
+                <li className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition">🧾 收據 / 發票</li>
+                <li className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition">📝 待辦清單</li>
+                <li className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition">🛍️ 商品願望清單</li>
+                <li className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition">📓 筆記</li>
+                <li className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition">📁 其他</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 主畫面內容 */}
+      <main className="flex-1 max-w-xl w-full mx-auto p-4 sm:p-6 space-y-6">
         
-        {/* 上傳檔案按鈕 */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-1">1. 選擇照片</label>
+        {/* 上傳照片區塊 */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-3">
+          <label className="block text-sm font-semibold text-gray-800">1. 選擇或拍攝照片</label>
           <input 
             type="file" accept="image/*"
             onChange={handleImageSelect} 
-            className="block w-full border border-gray-300 p-2 rounded bg-white text-black text-sm"
+            className="block w-full border border-gray-300 p-2.5 rounded-xl bg-gray-50 text-black text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
           />
         </div>
 
         {/* 預覽與類別選擇區塊 */}
         {preview && (
-          <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200 mb-6 space-y-4">
-            <img src={preview} alt="預覽" className="w-full h-auto object-contain rounded shadow-sm border bg-black/5" />
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+            <img src={preview} alt="預覽" className="w-full h-auto object-contain rounded-xl border bg-black/5 max-h-80 mx-auto" />
             
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">2. 選擇這份資料的類別</label>
+              <label className="block text-sm font-semibold text-gray-800 mb-1">2. 選擇這份資料的類別</label>
               <select 
                 value={selectedCategory} 
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full p-2.5 border border-gray-300 rounded-lg bg-white text-black font-medium focus:ring-2 focus:ring-black focus:outline-none"
+                className="w-full p-3 border border-gray-300 rounded-xl bg-white text-black font-medium focus:ring-2 focus:ring-black focus:outline-none"
               >
                 <option value="receipt">收據 / 發票</option>
                 <option value="whiteboard">待辦清單</option>
@@ -175,21 +198,25 @@ export default function Home() {
             <button 
               onClick={handleAnalyze} 
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium shadow flex items-center justify-center"
+              className="w-full bg-blue-600 text-white py-3.5 rounded-xl hover:bg-blue-700 transition font-semibold shadow-md flex items-center justify-center disabled:opacity-50"
             >
-              {loading ? "AI 深度分析中..." : "✨ 開始 AI 分析"}
+              {loading ? "✨ AI 深度分析中..." : "✨ 開始 AI 分析"}
             </button>
           </div>
         )}
 
-        {loading && <p className="text-blue-500 animate-pulse mb-4 text-center">AI 正在努力萃取圖中資訊，請稍候...</p>}
+        {loading && (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+            <p className="text-blue-600 font-medium mt-2">AI 正在努力萃取圖中資訊，請稍候...</p>
+          </div>
+        )}
 
         {/* 分析結果與編輯表單 */}
         {data && (
-          <div className="bg-white p-5 rounded-xl shadow-md border border-gray-200 space-y-4">
-            <h2 className="text-lg font-bold text-gray-800 border-b pb-2">3. 確認與編輯萃取結果</h2>
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900 border-b pb-2">3. 確認與編輯萃取結果</h2>
             
-            {/* 標題欄位 */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">標題</label>
               <input 
@@ -197,69 +224,65 @@ export default function Home() {
                 placeholder="請輸入標題..." 
                 value={data.title || ""} 
                 onChange={e => setData({...data, title: e.target.value})} 
-                className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" 
+                className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" 
               />
             </div>
 
-            {/* 收據表單 */}
             {data.category === "receipt" && (
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">商家名稱</label>
-                  <input type="text" placeholder="例：全聯福利中心" value={data.merchant || ""} onChange={e => setData({...data, merchant: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="text" placeholder="例：全聯福利中心" value={data.merchant || ""} onChange={e => setData({...data, merchant: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">日期</label>
-                  <input type="date" value={data.date || ""} onChange={e => setData({...data, date: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="date" value={data.date || ""} onChange={e => setData({...data, date: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">總金額</label>
-                  <input type="number" placeholder="0" value={data.total_amount || ""} onChange={e => setData({...data, total_amount: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="number" placeholder="0" value={data.total_amount ?? ""} onChange={e => setData({...data, total_amount: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
               </div>
             )}
 
-            {/* 待辦清單表單 */}
             {data.category === "whiteboard" && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">待辦事項 (每行一項)</label>
-                <textarea placeholder="輸入待辦項目..." value={(data.tasks || []).join("\n")} onChange={e => setData({...data, tasks: e.target.value.split("\n")})} className="w-full p-2.5 border border-gray-300 rounded-lg h-32 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                <textarea placeholder="輸入待辦項目..." value={(data.tasks || []).join("\n")} onChange={e => setData({...data, tasks: e.target.value.split("\n")})} className="w-full p-3 border border-gray-300 rounded-xl h-32 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
               </div>
             )}
 
-            {/* 筆記與其他表單 */}
             {(data.category === "handwritten_note" || data.category === "other") && (
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">摘要</label>
-                  <input type="text" placeholder="簡單摘要..." value={data.summary || ""} onChange={e => setData({...data, summary: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="text" placeholder="簡單摘要..." value={data.summary || ""} onChange={e => setData({...data, summary: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">完整內容</label>
-                  <textarea placeholder="完整文字內容..." value={data.full_text || ""} onChange={e => setData({...data, full_text: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg h-40 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <textarea placeholder="完整文字內容..." value={data.full_text || ""} onChange={e => setData({...data, full_text: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl h-40 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
               </div>
             )}
 
-            {/* 商品表單 */}
             {data.category === "product" && (
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">品牌</label>
-                  <input type="text" placeholder="品牌名稱" value={data.brand || ""} onChange={e => setData({...data, brand: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="text" placeholder="品牌名稱" value={data.brand || ""} onChange={e => setData({...data, brand: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">商品名稱</label>
-                  <input type="text" placeholder="商品名稱" value={data.product_name || ""} onChange={e => setData({...data, product_name: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="text" placeholder="商品名稱" value={data.product_name || ""} onChange={e => setData({...data, product_name: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">價格</label>
-                  <input type="number" placeholder="0" value={data.price || ""} onChange={e => setData({...data, price: e.target.value})} className="w-full p-2.5 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="number" placeholder="0" value={data.price ?? ""} onChange={e => setData({...data, price: e.target.value})} className="w-full p-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black" />
                 </div>
               </div>
             )}
 
-            <button onClick={handleSave} className="mt-4 w-full bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition font-medium shadow">
+            <button onClick={handleSave} className="mt-4 w-full bg-black text-white py-3.5 rounded-xl hover:bg-gray-800 transition font-semibold shadow-md">
               確認無誤並儲存至資料庫
             </button>
           </div>
