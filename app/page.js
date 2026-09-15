@@ -89,8 +89,7 @@ export default function Home() {
       />
 
       {loading && <p className="text-blue-500 animate-pulse mb-4">AI 正在努力辨識中...</p>}
-      {preview && <img src={preview} alt="預覽" className="w-full h-48 object-cover rounded mb-6 shadow-sm" />}
-
+      {preview && <img src={preview} alt="預覽" className="w-full h-auto object-contain rounded mb-6 shadow-sm" />}
       {data && (
         <div className="bg-gray-50 p-4 rounded-lg shadow border border-gray-200">
           <h2 className="text-lg font-semibold mb-4 border-b pb-2">
